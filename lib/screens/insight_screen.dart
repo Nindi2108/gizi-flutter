@@ -1,0 +1,251 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../services/api_service.dart';
+
+class InsightScreen extends StatefulWidget {
+  const InsightScreen({super.key});
+
+  @override
+  State<InsightScreen> createState() => _InsightScreenState();
+}
+
+class _InsightScreenState extends State<InsightScreen> {
+  Map<String, dynamic>? _data;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  double _pd(dynamic val, [double def = 0]) {
+    if (val == null) return def;
+    if (val is double) return val;
+    if (val is int) return val.toDouble();
+    if (val is String) return double.tryParse(val) ?? def;
+    return def;
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await ApiService.getInsight();
+      if (res['success'] == true) {
+        setState(() { _data = res['data']; _loading = false; });
+      } else {
+        setState(() { _error = res['message'] ?? 'Gagal memuat insight'; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = 'Tidak dapat terhubung ke server.'; _loading = false; });
+    }
+  }
+
+  Color _bmiColor(double? bmi) {
+    if (bmi == null || bmi == 0) return const Color(0xFF10b981);
+    if (bmi < 18.5) return const Color(0xff3f6cb3);
+    if (bmi < 25)   return const Color(0xFF10b981);
+    if (bmi < 30)   return const Color(0xFFf59e0b);
+    return const Color(0xFFef4444);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF10b981)))
+          : _error != null
+              ? _buildError()
+              : _buildContent(),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const Icon(Icons.bar_chart, size: 64, color: Color(0xFF94A3B8)),
+        const SizedBox(height: 16),
+        Text(_error!, style: GoogleFonts.inter(color: const Color(0xFF64748B))),
+        const SizedBox(height: 16),
+        ElevatedButton(onPressed: _load, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10b981), foregroundColor: Colors.white), child: const Text('Coba Lagi')),
+      ]),
+    );
+  }
+
+  Widget _buildContent() {
+    final d = _data!;
+    final bmi = _pd(d['bmi']);
+    final bmiColor = _bmiColor(bmi);
+    final weekly = (d['weekly_summary'] as List?) ?? [];
+    final targetKal = _pd(d['target_kalori'], 1);
+    final consumedKal = _pd(d['consumed_kalori']);
+    final pctKal = _pd(d['pct_kalori']).toInt();
+
+    final macros = [
+      {'label': 'Protein',    'cur': d['consumed_protein'], 'tar': d['target_protein'], 'color': const Color(0xFF3b82f6)},
+      {'label': 'Karbohidrat','cur': d['consumed_karbo'],   'tar': d['target_karbo'],   'color': const Color(0xFFf59e0b)},
+      {'label': 'Lemak',      'cur': d['consumed_lemak'],   'tar': d['target_lemak'],   'color': const Color(0xFFef4444)},
+    ];
+
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          backgroundColor: Colors.white,
+          pinned: true,
+          title: Text('Insight Kesehatan', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))),
+          actions: [IconButton(icon: const Icon(Icons.refresh_rounded, color: Color(0xFF10b981)), onPressed: _load)],
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverList(delegate: SliverChildListDelegate([
+
+            // BMI Card
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+              child: Column(children: [
+                Text('SKOR BMI', style: GoogleFonts.inter(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8))),
+                const SizedBox(height: 8),
+                Text(bmi?.toStringAsFixed(1) ?? '-', style: GoogleFonts.inter(fontSize: 52, fontWeight: FontWeight.w800, color: bmiColor, height: 1)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                  decoration: BoxDecoration(color: bmiColor.withOpacity(0.1), borderRadius: BorderRadius.circular(99)),
+                  child: Text(d['status'] ?? '-', style: GoogleFonts.inter(color: bmiColor, fontWeight: FontWeight.w700, fontSize: 13)),
+                ),
+                const SizedBox(height: 20),
+                Row(children: [
+                  _miniStat('Tinggi', '${d['tinggi_badan'] ?? '-'} cm'),
+                  const SizedBox(width: 10),
+                  _miniStat('Berat', '${d['berat_badan'] ?? '-'} kg'),
+                  const SizedBox(width: 10),
+                  _miniStat('Ideal', '${d['berat_ideal'] ?? '-'} kg'),
+                ]),
+              ]),
+            ),
+            const SizedBox(height: 16),
+
+            // Calorie Progress
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Text('Kalori Hari Ini', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))),
+                  Text('$pctKal%', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: const Color(0xFF10b981))),
+                ]),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: (consumedKal / targetKal).clamp(0.0, 1.0),
+                    minHeight: 12,
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10b981)),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text('${consumedKal.toInt()} / ${targetKal.toInt()} kkal', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+              ]),
+            ),
+            const SizedBox(height: 16),
+
+            // Weekly Chart
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Tren Kalori 7 Hari', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))),
+                const SizedBox(height: 4),
+                Text('Perbandingan asupan harian', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8))),
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 140,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: weekly.map<Widget>((day) {
+                      final kal = _pd(day['kalori']);
+                      final tar = _pd(day['target'], 1);
+                      final pct = (kal / tar).clamp(0.05, 1.0);
+                      final isToday = day['date'] == DateTime.now().toIso8601String().split('T')[0];
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                            Text('${kal.toInt()}', style: GoogleFonts.inter(fontSize: 8, color: const Color(0xFF94A3B8))),
+                            const SizedBox(height: 4),
+                            Expanded(
+                              child: FractionallySizedBox(
+                                alignment: Alignment.bottomCenter,
+                                heightFactor: pct,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isToday ? const Color(0xFF10b981) : const Color(0xFF10b981).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(day['day'] ?? '', style: GoogleFonts.inter(fontSize: 10, fontWeight: isToday ? FontWeight.w700 : FontWeight.w400, color: isToday ? const Color(0xFF10b981) : const Color(0xFF94A3B8))),
+                          ]),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 16),
+
+            // Macros
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)]),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Distribusi Makronutrisi', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))),
+                const SizedBox(height: 16),
+                ...macros.map((m) {
+                  final cur = _pd(m['cur']);
+                  final tar = _pd(m['tar'], 1);
+                  final pct = (cur / tar).clamp(0.0, 1.0);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        Text(m['label'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: const Color(0xFF374151))),
+                        Text('${cur.toInt()} / ${tar.toInt()}g', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8))),
+                      ]),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(value: pct, minHeight: 8, backgroundColor: const Color(0xFFF1F5F9), valueColor: AlwaysStoppedAnimation<Color>(m['color'] as Color)),
+                      ),
+                    ]),
+                  );
+                }),
+              ]),
+            ),
+            const SizedBox(height: 24),
+          ])),
+        ),
+      ],
+    );
+  }
+
+  Widget _miniStat(String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12)),
+        child: Column(children: [
+          Text(label, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+          const SizedBox(height: 4),
+          Text(value, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))),
+        ]),
+      ),
+    );
+  }
+}

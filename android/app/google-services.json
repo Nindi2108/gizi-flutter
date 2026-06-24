@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "439907351995",
+    "project_id": "giziapp-a75e0",
+    "storage_bucket": "giziapp-a75e0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:439907351995:android:f843277917cad5a270989e",
+        "android_client_info": {
+          "package_name": "com.giziapp.gizi_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPQzODYYgoAp4zGlWykhSgZIs6YfJIwOc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

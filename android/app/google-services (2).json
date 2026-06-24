@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "439907351995",
+    "project_id": "giziapp-a75e0",
+    "storage_bucket": "giziapp-a75e0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:439907351995:android:f843277917cad5a270989e",
+        "android_client_info": {
+          "package_name": "com.giziapp.gizi_flutter"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "439907351995-6q4ab7bqq9et14e4obbjrqoekd539a60.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.giziapp.gizi_flutter",
+            "certificate_hash": "10b10d12ba449a07f241c9456415ae0292e3e499"
+          }
+        },
+        {
+          "client_id": "439907351995-9a38oj99i8rnbambgvh1k65tcseso3kq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPQzODYYgoAp4zGlWykhSgZIs6YfJIwOc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "439907351995-9a38oj99i8rnbambgvh1k65tcseso3kq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
