@@ -1,16 +1,7 @@
 {
   "version": 2,
-  "framework": null,
-  "builds": [
-    {
-      "src": "public/index.php",
-      "use": "@vercel/php"
-    }
-  ],
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "public/index.php"
-    }
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
   ]
-} inidimana
+}
