@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'food_search_screen.dart';
 import 'bmi_create_screen.dart';
+import 'login_screen.dart';
 import '../services/api_service.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -231,15 +233,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            const CircleAvatar(
-              backgroundColor: Color(0xFF16A34A),
-              child: Icon(Icons.person, color: Colors.white),
+            GestureDetector(
+              onTap: () => _showLogoutDialog(context),
+              child: const CircleAvatar(
+                backgroundColor: Color(0xFF16A34A),
+                child: Icon(Icons.person, color: Colors.white),
+              ),
             ),
           ],
         ),
       ],
     );
   }
+
+  Future<void> _showLogoutDialog(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Keluar',
+          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+        ),
+        content: const Text('Apakah Anda yakin ingin keluar dari GiziApp?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Keluar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await ApiService.logout();
+      } catch (_) {}
+      await ApiService.clearToken();
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    }
+  }
+
 
   Widget _buildTopStats(Map<String, dynamic> result) {
     final bmi = _pd(result['bmi']);
@@ -446,7 +493,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(child: Text(log['food_name'] ?? '-', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
-                    Text('${(log['kalori'] ?? 0).toInt()} kkal', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF16A34A))),
+                    Text('${_pd(log['kalori']).toInt()} kkal', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF16A34A))),
                   ],
                 );
               },

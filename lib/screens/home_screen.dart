@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/api_service.dart';
-import 'login_screen.dart';
 import 'dashboard_screen.dart';
 import 'insight_screen.dart';
 import 'bmi_create_screen.dart';
@@ -28,18 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
     BmiCreateScreen(onSaved: _switchToDashboard),
   ];
 
-  Future<void> _logout() async {
-    try {
-      await ApiService.logout();
-    } catch (_) {}
-    await ApiService.clearToken();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (_) => false,
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {

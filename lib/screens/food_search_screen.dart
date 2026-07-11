@@ -188,9 +188,19 @@ class _FoodSearchScreenState extends State<FoodSearchScreen>
   }
 
   Future<void> _logFood(int foodId, double porsi) async {
+    // Tampilkan dialog loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+      ),
+    );
+
     try {
       final res = await ApiService.logFood(foodId, _selectedSlot, porsi: porsi);
       if (mounted) {
+        Navigator.pop(context); // Tutup dialog loading
         if (res['success'] == true) {
           _hasLoggedAnyFood = true;
           final nextSlot = res['next_slot'] as String?;
@@ -210,28 +220,48 @@ class _FoodSearchScreenState extends State<FoodSearchScreen>
             ),
           );
 
-          if (nextSlot != null && nextSlot != oldSlot && _slotInfo.containsKey(nextSlot)) {
-            // Auto switch ke slot berikutnya karena sudah terpenuhi!
-            setState(() {
-              _selectedSlot = nextSlot;
-              _searchController.clear();
-            });
-            _applyFilter();
-            
-            // Beri tahu user bahwa slot berganti otomatis
-            Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Target ${_slotInfo[oldSlot]?['label']} terpenuhi! Lanjut ke ${_slotInfo[nextSlot]?['label']}.'),
-                    backgroundColor: Colors.blue[600],
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 3),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
-              }
-            });
+          if (nextSlot != null && nextSlot != oldSlot) {
+            if (_slotInfo.containsKey(nextSlot)) {
+              // Auto switch ke slot berikutnya
+              setState(() {
+                _selectedSlot = nextSlot;
+                _searchController.clear();
+              });
+              _applyFilter();
+              
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Target ${_slotInfo[oldSlot]?['label']} terpenuhi! Lanjut ke ${_slotInfo[nextSlot]?['label']}.'),
+                      backgroundColor: Colors.blue[600],
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 3),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                }
+              });
+            } else {
+              // Jika nextSlot bukan sarapan/siang/malam/cemilan
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('Peringatan: Batas maksimal untuk ${_slotInfo[oldSlot]?['label']} sudah terpenuhi/berlebih!')),
+                      ]),
+                      backgroundColor: const Color(0xFFF59E0B), // Orange warning
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  );
+                }
+              });
+            }
           }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -241,6 +271,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen>
       }
     } catch (e) {
       if (mounted) {
+        Navigator.pop(context); // Tutup dialog loading jika error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );

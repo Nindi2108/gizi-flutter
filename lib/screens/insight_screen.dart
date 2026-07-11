@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 import '../services/api_service.dart';
 
 class InsightScreen extends StatefulWidget {
@@ -14,10 +16,26 @@ class _InsightScreenState extends State<InsightScreen> {
   bool _loading = true;
   String? _error;
 
+  String? _geminiApiKey;
+  final TextEditingController _apiKeyController = TextEditingController();
+  bool _isGeneratingAi = false;
+  String? _aiResponse;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadApiKey();
+  }
+
+  Future<void> _loadApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _geminiApiKey = prefs.getString('gemini_api_key');
+      if (_geminiApiKey != null) {
+        _apiKeyController.text = _geminiApiKey!;
+      }
+    });
   }
 
   double _pd(dynamic val, [double def = 0]) {
@@ -108,7 +126,7 @@ class _InsightScreenState extends State<InsightScreen> {
               child: Column(children: [
                 Text('SKOR BMI', style: GoogleFonts.inter(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8))),
                 const SizedBox(height: 8),
-                Text(bmi?.toStringAsFixed(1) ?? '-', style: GoogleFonts.inter(fontSize: 52, fontWeight: FontWeight.w800, color: bmiColor, height: 1)),
+                Text(bmi == 0 ? '-' : bmi.toStringAsFixed(1), style: GoogleFonts.inter(fontSize: 52, fontWeight: FontWeight.w800, color: bmiColor, height: 1)),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -228,6 +246,7 @@ class _InsightScreenState extends State<InsightScreen> {
                 }),
               ]),
             ),
+            _buildAiRecommendationCard(),
             const SizedBox(height: 24),
           ])),
         ),
@@ -245,6 +264,236 @@ class _InsightScreenState extends State<InsightScreen> {
           const SizedBox(height: 4),
           Text(value, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))),
         ]),
+      ),
+    );
+  }
+
+  Future<void> _generateAiAnalysis() async {
+    if (_geminiApiKey == null || _geminiApiKey!.isEmpty) return;
+    setState(() {
+      _isGeneratingAi = true;
+      _aiResponse = null;
+    });
+
+    final d = _data!;
+    final bmi = _pd(d['bmi']);
+    final bmiStatus = d['status'] ?? '-';
+    final height = d['tinggi_badan'] ?? '-';
+    final weight = d['berat_badan'] ?? '-';
+    final idealWeight = d['berat_ideal'] ?? '-';
+    final targetKal = _pd(d['target_kalori']);
+    final consumedKal = _pd(d['consumed_kalori']);
+    final protein = d['consumed_protein'] ?? 0;
+    final targetProtein = d['target_protein'] ?? 0;
+    final karbo = d['consumed_karbo'] ?? 0;
+    final targetKarbo = d['target_karbo'] ?? 0;
+    final lemak = d['consumed_lemak'] ?? 0;
+    final targetLemak = d['target_lemak'] ?? 0;
+
+    final prompt = """
+Analisis data gizi harian saya berikut ini:
+- Skor BMI: $bmi (Status: $bmiStatus)
+- Tinggi Badan: $height cm, Berat Badan: $weight kg (Berat Ideal: $idealWeight kg)
+- Asupan Kalori Hari Ini: $consumedKal kkal dari target $targetKal kkal
+- Asupan Protein: ${protein}g dari target ${targetProtein}g
+- Asupan Karbohidrat: ${karbo}g dari target ${targetKarbo}g
+- Asupan Lemak: ${lemak}g dari target ${targetLemak}g
+
+Berdasarkan data di atas, tolong berikan analisis gizi dan rekomendasi pola makan singkat, terfokus, praktis, dan memotivasi dalam Bahasa Indonesia. Format dalam bullet points markdown. Batasi maksimal 3 poin penting saja. Jangan beri kalimat pengantar yang terlalu panjang.
+""";
+
+    try {
+      final model = GenerativeModel(
+        model: 'gemini-1.5-flash',
+        apiKey: _geminiApiKey!,
+      );
+
+      final content = [Content.text(prompt)];
+      final response = await model.generateContent(content);
+      setState(() {
+        _aiResponse = response.text;
+        _isGeneratingAi = false;
+      });
+    } catch (e) {
+      setState(() {
+        _aiResponse = "Gagal memproses rekomendasi AI: $e\n\nPastikan API Key Google AI Studio Anda valid.";
+        _isGeneratingAi = false;
+      });
+    }
+  }
+
+  Widget _buildAiRecommendationCard() {
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFECFDF5), Color(0xFFF0FDF4)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFBEF264).withOpacity(0.5), width: 1.5),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.psychology_rounded, color: Color(0xFF16A34A), size: 24),
+              const SizedBox(width: 8),
+              Text(
+                'AI Nutrition Assistant',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: const Color(0xFF1E293B),
+                ),
+              ),
+              const Spacer(),
+              if (_geminiApiKey != null)
+                IconButton(
+                  icon: const Icon(Icons.settings, color: Colors.grey, size: 18),
+                  onPressed: () {
+                    setState(() {
+                      _geminiApiKey = null;
+                    });
+                  },
+                  tooltip: 'Ganti API Key',
+                  constraints: const BoxConstraints(),
+                  padding: EdgeInsets.zero,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_geminiApiKey == null) ...[
+            Text(
+              'Aktifkan analisis gizi pintar secara instan menggunakan Google Gemini Pro.',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _apiKeyController,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: 'Masukkan Gemini API Key Anda',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  final key = _apiKeyController.text.trim();
+                  if (key.isNotEmpty) {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('gemini_api_key', key);
+                    setState(() {
+                      _geminiApiKey = key;
+                    });
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFBEF264),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                child: const Text('Simpan & Aktifkan AI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ),
+          ] else ...[
+            if (_aiResponse == null && !_isGeneratingAi) ...[
+              Text(
+                'Dapatkan saran menu makanan, analisis BMI, dan tips kesehatan personal dari AI berdasarkan riwayat Anda.',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _generateAiAnalysis,
+                  icon: const Icon(Icons.auto_awesome, size: 16),
+                  label: const Text('Tanya Asisten AI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFBEF264),
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ] else if (_isGeneratingAi) ...[
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(color: Color(0xFF16A34A)),
+                      SizedBox(height: 12),
+                      Text('Gemini sedang menganalisis gizi Anda...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ),
+            ] else if (_aiResponse != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade100),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _aiResponse!,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12.5,
+                        color: const Color(0xFF334155),
+                        height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Analisis AI realtime', style: TextStyle(fontSize: 9, color: Colors.grey[400])),
+                        TextButton.icon(
+                          onPressed: _generateAiAnalysis,
+                          icon: const Icon(Icons.refresh, size: 12, color: Color(0xFF16A34A)),
+                          label: const Text('Analisis Ulang', style: TextStyle(fontSize: 11, color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ],
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:gizi_flutter/services/api_service.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
+import 'coach_home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,14 +35,30 @@ class _LoginScreenState extends State<LoginScreen> {
       final res = await ApiService.login(email, password);
 
       if (res['success'] == true) {
-        // Simpan token
-        await ApiService.saveToken(res['token']);
+        final String role = res['role'] ?? res['data']?['role'] ?? 'user';
+        final String? name = res['data']?['name'];
+        final String? userEmail = res['data']?['email'];
+
+        // Simpan token, role, nama, dan email
+        await ApiService.saveToken(
+          res['token'],
+          role: role,
+          name: name,
+          email: userEmail,
+        );
         
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          );
+          if (role == 'coach') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const CoachHomeScreen()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            );
+          }
         }
       } else {
         if (mounted) {

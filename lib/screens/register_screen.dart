@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:gizi_flutter/services/api_service.dart';
 import 'home_screen.dart';
-import 'home_screen.dart';
+import 'coach_home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -16,7 +16,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
+  final _coachCodeController = TextEditingController();
   bool _isLoading = false;
+  String _selectedRole = 'user'; // 'user' = atlet, 'coach' = pelatih
 
   Future<void> _handleRegister() async {
     final name = _nameController.text.trim();
@@ -31,6 +33,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (_selectedRole == 'coach') {
+      final coachCode = _coachCodeController.text.trim();
+      if (coachCode.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kode verifikasi pelatih wajib diisi')),
+        );
+        return;
+      }
+      if (coachCode != 'pelatihakses') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kode verifikasi pelatih salah!')),
+        );
+        return;
+      }
+    }
+
     if (password != passwordConfirm) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password dan konfirmasi password tidak cocok')),
@@ -41,21 +59,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final res = await ApiService.register(name, email, password, passwordConfirm);
+      final res = await ApiService.register(
+        name,
+        email,
+        password,
+        passwordConfirm,
+        role: _selectedRole,
+      );
 
       if (res['success'] == true) {
-        // Simpan token
-        await ApiService.saveToken(res['token']);
+        // Baca role, nama, dan email dari API response
+        final String role = res['role'] ?? res['data']?['role'] ?? _selectedRole;
+        final String? userName = res['data']?['name'];
+        final String? userEmail = res['data']?['email'];
+
+        await ApiService.saveToken(
+          res['token'],
+          role: role,
+          name: userName,
+          email: userEmail,
+        );
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Registrasi berhasil!')),
+            SnackBar(
+              content: Text(
+                role == 'coach'
+                    ? 'Registrasi berhasil! Selamat datang, Pelatih!'
+                    : 'Registrasi berhasil! Selamat datang!',
+              ),
+            ),
           );
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-            (route) => false,
-          );
+          
+          if (role == 'coach') {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const CoachHomeScreen()),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+            );
+          }
         }
       } else {
         if (mounted) {
@@ -82,14 +130,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final res = await ApiService.loginWithGoogle();
       
       if (res['success'] == true) {
-        await ApiService.saveToken(res['token']);
+        final String role = res['role'] ?? res['data']?['role'] ?? 'user';
+        final String? userName = res['data']?['name'];
+        final String? userEmail = res['data']?['email'];
+
+        await ApiService.saveToken(
+          res['token'],
+          role: role,
+          name: userName,
+          email: userEmail,
+        );
         
         if (mounted) {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-            (route) => false,
-          );
+          if (role == 'coach') {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const CoachHomeScreen()),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+            );
+          }
         }
       } else {
         if (mounted) {
@@ -158,7 +223,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
+
+              // ── PILIHAN ROLE ─────────────────────────────────
+              _buildLabel('DAFTAR SEBAGAI'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildRoleCard(
+                      title: 'Atlet',
+                      subtitle: 'Pantau gizi & nutrisi harian',
+                      icon: Icons.directions_run_rounded,
+                      value: 'user',
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildRoleCard(
+                      title: 'Pelatih',
+                      subtitle: 'Pantau perkembangan atlet',
+                      icon: Icons.sports_rounded,
+                      value: 'coach',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
 
               // Form Input Nama Lengkap
               _buildLabel('NAMA LENGKAP'),
@@ -176,6 +267,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 20),
+
+              // Form Input Kode Verifikasi Pelatih
+              if (_selectedRole == 'coach') ...[
+                _buildLabel('KODE AKSES VERIFIKASI PELATIH'),
+                _buildTextField(
+                  controller: _coachCodeController,
+                  hintText: 'Masukkan kode akses pelatih',
+                  obscureText: true,
+                ),
+                const SizedBox(height: 20),
+              ],
 
               // Form Input Password
               _buildLabel('PASSWORD'),
@@ -214,7 +316,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                         )
                       : Text(
-                          'Daftar Sekarang',
+                          _selectedRole == 'coach'
+                              ? 'Daftar sebagai Pelatih'
+                              : 'Daftar sebagai Atlet',
                           style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 16),
                         ),
                 ),
@@ -343,6 +447,62 @@ class _RegisterScreenState extends State<RegisterScreen> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFFBEF264), width: 2),
+        ),
+      ),
+    );
+  }
+
+  /// Card pemilih role (Atlet / Pelatih)
+  Widget _buildRoleCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required String value,
+  }) {
+    final bool isSelected = _selectedRole == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedRole = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFBEF264).withOpacity(0.15)
+              : const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF65A30D) : Colors.grey.shade200,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 28,
+              color: isSelected ? const Color(0xFF16A34A) : Colors.grey[400],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: isSelected
+                    ? const Color(0xFF16A34A)
+                    : const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 10,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
         ),
       ),
     );
