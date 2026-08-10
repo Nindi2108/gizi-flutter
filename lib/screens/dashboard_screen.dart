@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'food_search_screen.dart';
 import 'bmi_create_screen.dart';
-import 'login_screen.dart';
+import 'profile_screen.dart';
 import '../services/api_service.dart';
 
 
@@ -234,7 +234,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(width: 12),
             GestureDetector(
-              onTap: () => _showLogoutDialog(context),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                );
+                _fetchDashboard();
+              },
               child: const CircleAvatar(
                 backgroundColor: Color(0xFF16A34A),
                 child: Icon(Icons.person, color: Colors.white),
@@ -244,47 +250,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
     );
-  }
-
-  Future<void> _showLogoutDialog(BuildContext context) async {
-    final navigator = Navigator.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Keluar',
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
-        ),
-        content: const Text('Apakah Anda yakin ingin keluar dari GiziApp?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Keluar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await ApiService.logout();
-      } catch (_) {}
-      await ApiService.clearToken();
-      navigator.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (_) => false,
-      );
-    }
   }
 
 

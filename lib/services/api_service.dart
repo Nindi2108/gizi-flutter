@@ -6,16 +6,24 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/app_config.dart';
 
 class ApiService {
   static String get baseUrl => AppConfig.baseUrl;
   static bool useMockData = false;
 
+  // Instansi FlutterSecureStorage untuk enkripsi data sensitif
+  static const _secureStorage = FlutterSecureStorage();
+
   // ── Token & Session ─────────────────────────────────────────
   static Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
+    try {
+      return await _secureStorage.read(key: 'token');
+    } catch (e) {
+      debugPrint('Error reading secure token: $e');
+      return null;
+    }
   }
 
   static Future<String?> getRole() async {
@@ -35,16 +43,26 @@ class ApiService {
 
   static Future<void> saveToken(String token,
       {String role = 'user', String? name, String? email}) async {
+    try {
+      await _secureStorage.write(key: 'token', value: token);
+    } catch (e) {
+      debugPrint('Error saving secure token: $e');
+    }
+    
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('token', token);
     await prefs.setString('role', role);
     if (name != null) await prefs.setString('user_name', name);
     if (email != null) await prefs.setString('user_email', email);
   }
 
   static Future<void> clearToken() async {
+    try {
+      await _secureStorage.delete(key: 'token');
+    } catch (e) {
+      debugPrint('Error deleting secure token: $e');
+    }
+    
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
     await prefs.remove('user_name');
     await prefs.remove('user_email');
     await prefs.remove('role');
@@ -132,18 +150,60 @@ class ApiService {
     String password,
     String passwordConfirmation, {
     String role = 'user',
+    String? coachCode,
   }) async {
     try {
+      final Map<String, dynamic> bodyData = {
+        'name': name,
+        'email': email,
+        'password': password,
+        'password_confirmation': passwordConfirmation,
+        'role': role,
+      };
+      if (coachCode != null) {
+        bodyData['coach_code'] = coachCode;
+      }
+
       final res = await http
           .post(
             Uri.parse('$baseUrl/register'),
             headers: await _headers(),
+            body: jsonEncode(bodyData),
+          )
+          .timeout(AppConfig.connectTimeout);
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/forgot-password'),
+            headers: await _headers(),
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(AppConfig.connectTimeout);
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> resetPassword(
+      String email, String otp, String password, String passwordConfirm) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/reset-password'),
+            headers: await _headers(),
             body: jsonEncode({
-              'name': name,
               'email': email,
+              'otp': otp,
               'password': password,
-              'password_confirmation': passwordConfirmation,
-              'role': role,
+              'password_confirmation': passwordConfirm,
             }),
           )
           .timeout(AppConfig.connectTimeout);
@@ -173,7 +233,7 @@ class ApiService {
   /// Validasi token ke server — digunakan saat auto-login di splash/landing
   static Future<Map<String, dynamic>> validateToken() async {
     final token = await getToken();
-    if (token != null && token.startsWith('demo_token')) {
+    if (kDebugMode && token != null && token.startsWith('demo_token')) {
       useMockData = true;
       return {'success': true, 'role': token == 'demo_token_coach' ? 'coach' : 'user'};
     }
@@ -297,6 +357,61 @@ class ApiService {
             {'food_id': foodId, 'waktu_makan': waktu, 'porsi_gram': porsi}),
       ).timeout(AppConfig.connectTimeout);
       return jsonDecode(res.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> logCustomFood({
+    required String namaMakanan,
+    required double kalori,
+    required double protein,
+    required double karbohidrat,
+    required double lemak,
+    required String waktuMakan,
+    double porsi = 100,
+    String? resep,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/food/log'),
+        headers: await _headers(auth: true),
+        body: jsonEncode({
+          'is_custom': true,
+          'nama_makanan': namaMakanan,
+          'kalori': kalori,
+          'protein': protein,
+          'karbohidrat': karbohidrat,
+          'lemak': lemak,
+          'waktu_makan': waktuMakan,
+          'porsi_gram': porsi,
+          'resep': resep,
+        }),
+      ).timeout(AppConfig.connectTimeout);
+      return jsonDecode(res.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Gagal terhubung ke server: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> generateAiRecipe(String prompt) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/ai/recipe'),
+        headers: await _headers(auth: true),
+        body: jsonEncode({'prompt': prompt}),
+      ).timeout(AppConfig.connectTimeout);
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      } else {
+        try {
+          final err = jsonDecode(res.body);
+          return {'success': false, 'message': err['message'] ?? 'Gagal memproses AI Resep'};
+        } catch (_) {
+          return {'success': false, 'message': 'Gagal memproses AI Resep (Status: ${res.statusCode})'};
+        }
+      }
     } catch (e) {
       return {'success': false, 'message': 'Gagal terhubung ke server: $e'};
     }
@@ -486,6 +601,25 @@ class ApiService {
     } catch (e) {
       debugPrint('ApiService: Gagal mengambil profil pelatih: $e');
       return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  /// Ambil profil pengguna biasa (atlet)
+  static Future<Map<String, dynamic>> getUserProfile() async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/user'),
+        headers: await _headers(auth: true),
+      ).timeout(AppConfig.connectTimeout);
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      } else {
+        return {'success': false, 'message': 'Gagal mengambil profil dari server (Status: ${res.statusCode})'};
+      }
+    } catch (e) {
+      debugPrint('ApiService: Gagal mengambil profil pengguna: $e');
+      return {'success': false, 'message': 'Kesalahan koneksi: $e'};
     }
   }
 

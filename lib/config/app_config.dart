@@ -1,15 +1,18 @@
 // lib/config/app_config.dart
 // ── Konfigurasi Terpusat Aplikasi ────────────────────────────
-// Ganti baseUrl sesuai environment. Untuk production, ganti ke URL server publik.
+import 'package:flutter/foundation.dart';
 
 class AppConfig {
   // ─── BASE URL ───────────────────────────────────────────────
   // Lokal (Laragon) — gunakan IP WiFi laptop agar HP bisa akses di jaringan sama
-  // Contoh: 'http://192.168.1.7/gizi-app/public/api'
-  //
+  static const String _localUrl = 'http://192.168.1.6/gizi-app/public/api';
+
   // Production (setelah deploy ke VPS/hosting):
-  // Contoh: 'https://api.giziapp.com/api'
-  static const String baseUrl = 'https://gizi-app.onrender.com/api';
+  // ⚠️ WAJIB menggunakan HTTPS untuk keamanan data dan mencegah serangan MITM
+  static const String _productionUrl = 'https://api.giziapp.com/api'; // Ganti dengan domain produksi asli Anda
+
+  // Otomatis memilih URL berdasarkan mode aplikasi (Debug menggunakan lokal, Release menggunakan produksi secure)
+  static const String baseUrl = kDebugMode ? _localUrl : _productionUrl;
 
 
   // ─── APP INFO ───────────────────────────────────────────────

@@ -304,7 +304,7 @@ Berdasarkan data di atas, tolong berikan analisis gizi dan rekomendasi pola maka
 
     try {
       final model = GenerativeModel(
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3.5-flash',
         apiKey: _geminiApiKey!,
       );
 

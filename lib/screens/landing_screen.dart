@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
@@ -40,7 +41,7 @@ class _LandingScreenState extends State<LandingScreen> {
 
     // Cek token lokal
     final token = await ApiService.getToken();
-    final role = await ApiService.getRole() ?? 'user';
+    final localRole = await ApiService.getRole() ?? 'user';
 
     if (!mounted) return;
 
@@ -51,9 +52,17 @@ class _LandingScreenState extends State<LandingScreen> {
       if (!mounted) return;
 
       if (validation['success'] == true) {
-        // Token masih valid → auto-login langsung
+        // Ambil role terverifikasi dari server, fallback ke localRole
+        final serverRole = validation['role'] ?? validation['data']?['role'] ?? localRole;
+
+        // Perbarui local role agar sinkron dengan database
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('role', serverRole);
+
+        if (!mounted) return;
+
         setState(() => _isLoading = false);
-        if (role == 'coach') {
+        if (serverRole == 'coach') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const CoachHomeScreen()),

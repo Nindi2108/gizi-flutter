@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'ai_recipe_screen.dart';
 import '../services/api_service.dart';
 
 class FoodSearchScreen extends StatefulWidget {
@@ -99,79 +100,95 @@ class _FoodSearchScreenState extends State<FoodSearchScreen>
   void _showPortionDialog(dynamic food) {
     _porsiController.text = '100';
     final slotColor = (_slotInfo[_selectedSlot]?['color'] as Color?) ?? const Color(0xFF16A34A);
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              food['nama_makanan'],
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 4),
-            // Info nutrisi per 100g
-            Wrap(
-              spacing: 6,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoChip('🔥 ${food['kalori']} kkal', Colors.orange),
-                _infoChip('💪 P ${food['protein']}g', Colors.blue),
-                _infoChip('🌾 K ${food['karbohidrat']}g', Colors.amber),
-                _infoChip('🫙 L ${food['lemak']}g', Colors.red),
+                Text(
+                  food['nama_makanan'],
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 4),
+                // Info nutrisi per 100g
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    _infoChip('🔥 ${food['kalori']} kkal', Colors.orange),
+                    _infoChip('💪 P ${food['protein']}g', Colors.blue),
+                    _infoChip('🌾 K ${food['karbohidrat']}g', Colors.amber),
+                    _infoChip('🫙 L ${food['lemak']}g', Colors.red),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text('per 100g', style: TextStyle(fontSize: 10, color: Colors.grey[400])),
               ],
             ),
-            const SizedBox(height: 2),
-            Text('per 100g', style: TextStyle(fontSize: 10, color: Colors.grey[400])),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Berapa gram yang kamu makan?',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Berapa gram yang kamu makan?',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _porsiController,
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    suffixText: 'gram',
+                    filled: true,
+                    fillColor: const Color(0xFFF1F5F9),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: slotColor, width: 2),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _porsiController,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: InputDecoration(
-                suffixText: 'gram',
-                filled: true,
-                fillColor: const Color(0xFFF1F5F9),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: slotColor, width: 2),
-                ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                child: const Text('Batal', style: TextStyle(color: Colors.grey)),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _logFood(food['id'], double.tryParse(_porsiController.text) ?? 100);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: slotColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Catat Makan', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () {
+                        setStateDialog(() {
+                          isSubmitting = true;
+                        });
+                        Navigator.pop(context);
+                        _logFood(food['id'], double.tryParse(_porsiController.text) ?? 100);
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: slotColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Catat Makan', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        }
       ),
     );
   }
@@ -300,6 +317,23 @@ class _FoodSearchScreenState extends State<FoodSearchScreen>
             'Tambah Makanan',
             style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 18),
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.auto_awesome, color: Color(0xFF16A34A)),
+              tooltip: 'AI Resep & Gizi',
+              onPressed: () async {
+                final navigator = Navigator.of(context);
+                final logged = await navigator.push(
+                  MaterialPageRoute(
+                    builder: (context) => AiRecipeScreen(waktuMakan: _selectedSlot),
+                  ),
+                );
+                if (logged == true) {
+                  navigator.pop(true);
+                }
+              },
+            ),
+          ],
         ),
       body: Column(
         children: [
@@ -446,21 +480,47 @@ class _FoodSearchScreenState extends State<FoodSearchScreen>
   Widget _buildFoodList() {
     if (_filteredFoods.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
-            const SizedBox(height: 12),
-            Text(
-              'Makanan tidak ditemukan',
-              style: GoogleFonts.plusJakartaSans(color: Colors.grey[400], fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Coba kata kunci lain',
-              style: TextStyle(fontSize: 12, color: Colors.grey[300]),
-            ),
-          ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
+              const SizedBox(height: 12),
+              Text(
+                'Makanan tidak ditemukan',
+                style: GoogleFonts.plusJakartaSans(color: Colors.grey[400], fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Coba kata kunci lain, atau gunakan AI Resep untuk membuat makanan kustom Anda.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey[500], height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final navigator = Navigator.of(context);
+                  final logged = await navigator.push(
+                    MaterialPageRoute(
+                      builder: (context) => AiRecipeScreen(waktuMakan: _selectedSlot),
+                    ),
+                  );
+                  if (logged == true) {
+                    navigator.pop(true);
+                  }
+                },
+                icon: const Icon(Icons.auto_awesome, size: 16),
+                label: const Text('Buat & Catat dengan AI Resep', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFBEF264),
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }

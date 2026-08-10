@@ -33,6 +33,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // Validasi format email
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Format email tidak valid')),
+      );
+      return;
+    }
+
+    // Validasi kekuatan password (minimal 8 karakter, ada huruf dan angka)
+    final passwordRegex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).{8,}$');
+    if (!passwordRegex.hasMatch(password)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password harus minimal 8 karakter dan mengandung kombinasi huruf dan angka'),
+        ),
+      );
+      return;
+    }
+
     if (_selectedRole == 'coach') {
       final coachCode = _coachCodeController.text.trim();
       if (coachCode.isEmpty) {
@@ -41,6 +61,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
         return;
       }
+      // ⚠️ CATATAN KEAMANAN: Validasi di bawah ini hanyalah sanity check di sisi client.
+      // Server backend Anda WAJIB memvalidasi parameter 'coach_code' ini pada endpoint registrasinya.
       if (coachCode != 'pelatihakses') {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Kode verifikasi pelatih salah!')),
@@ -65,6 +87,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password,
         passwordConfirm,
         role: _selectedRole,
+        coachCode: _selectedRole == 'coach' ? _coachCodeController.text.trim() : null,
       );
 
       if (res['success'] == true) {
